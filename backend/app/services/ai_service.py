@@ -1,6 +1,8 @@
 import base64
+import time
 
 from google import genai
+from google.genai import types
 
 from app.core.config import GEMINI_API_KEY
 from app.services.conversation_service import (
@@ -9,12 +11,18 @@ from app.services.conversation_service import (
 )
 
 
+# ==============================
+# Gemini Client
+# ==============================
+
 client = genai.Client(
     api_key=GEMINI_API_KEY
 )
 
 
-
+# ==============================
+# Ask Phoe Htung
+# ==============================
 
 def ask_phohtaung(question: str) -> str:
 
@@ -34,9 +42,13 @@ LANGUAGE RULES:
 Your name is ဖိုးထောင်.
 """
 
-    # User message ကို memory ထဲသိမ်း
-    add_message("user", question)
 
+    # ==============================
+    # Build Conversation
+    # ==============================
+
+    # ဒီနေရာမှာ user message ကို
+    # Gemini အောင်မြင်ပြီးမှ memory ထဲသိမ်းမယ်။
     history = get_history()
 
     contents = []
@@ -46,26 +58,115 @@ Your name is ဖိုးထောင်.
             f"{message['role']}: {message['content']}"
         )
 
+    # လက်ရှိ user question ကို conversation ထဲထည့်
+    contents.append(
+        f"user: {question}"
+    )
+
     conversation = "\n".join(contents)
 
-    response = client.models.generate_content(
-        model="gemini-3.8-flash",
-        contents=conversation,
-        config={
-            "system_instruction": system_prompt,
-        },
-    )
+
+    # ==============================
+    # Gemini Request + Retry
+    # ==============================
+
+    max_retries = 3
+
+    response = None
+
+    for attempt in range(max_retries):
+
+        try:
+
+            print(
+                f"🤖 Gemini request "
+                f"(attempt {attempt + 1}/{max_retries})"
+            )
+
+            response = client.models.generate_content(
+                model="gemini-3.8-flash",
+                contents=conversation,
+                config=types.GenerateContentConfig(
+                    system_instruction=system_prompt,
+                ),
+            )
+
+            print("✅ Gemini response ရပါပြီ")
+
+            break
+
+
+        except Exception as error:
+
+            print(
+                f"⚠️ Gemini request failed "
+                f"(attempt {attempt + 1}/{max_retries})"
+            )
+
+            print(
+                f"⚠️ Error: {error}"
+            )
+
+
+            # နောက်ဆုံး attempt ဖြစ်ရင်
+            # error ကို backend ဆီပြန်ပို့
+            if attempt == max_retries - 1:
+
+                print(
+                    "❌ Gemini request အားလုံး မအောင်မြင်ပါ"
+                )
+
+                raise
+
+
+            # Retry မလုပ်ခင် 2 seconds စောင့်
+            print(
+                "⏳ 2 seconds စောင့်ပြီး retry လုပ်ပါမယ်..."
+            )
+
+            time.sleep(2)
+
+
+    # ==============================
+    # Get Answer
+    # ==============================
 
     answer = response.text
 
-    # AI answer ကို memory ထဲသိမ်း
-    add_message("assistant", answer)
+
+    # ==============================
+    # Save Conversation
+    # ==============================
+
+    # Gemini အောင်မြင်မှသာ
+    # user + assistant ကို memory ထဲသိမ်းမယ်
+    add_message(
+        "user",
+        question
+    )
+
+    add_message(
+        "assistant",
+        answer
+    )
+
 
     return answer
 
 
-def transcribe_audio(audio_bytes: bytes, mime_type: str) -> str:
-    audio_base64 = base64.b64encode(audio_bytes).decode("utf-8")
+# ==============================
+# Audio → Text
+# ==============================
+
+def transcribe_audio(
+    audio_bytes: bytes,
+    mime_type: str
+) -> str:
+
+    audio_base64 = base64.b64encode(
+        audio_bytes
+    ).decode("utf-8")
+
 
     interaction = client.interactions.create(
         model="gemini-3.8-flash",
@@ -84,5 +185,6 @@ def transcribe_audio(audio_bytes: bytes, mime_type: str) -> str:
             },
         ],
     )
+
 
     return interaction.output_text

@@ -1,4 +1,4 @@
-const API_URL = "http://127.0.0.1:8000";
+const API_URL = "https://phoe-htong.onrender.com";
 
 const SpeechRecognition =
     window.SpeechRecognition ||
@@ -227,8 +227,35 @@ recognition.onerror = (event) => {
 // ==============================
 
 async function askAI(text) {
-
     try {
+
+        // ==============================
+        // Thinking UI
+        // ==============================
+
+        setStatus(
+            "thinking",
+            "🟡 ဖိုးထောင် စဉ်းစားနေပါတယ်..."
+        );
+
+        answerBox.innerHTML = `
+            <div class="answer-header">
+                🤖 ဖိုးထောင်
+            </div>
+
+            <div class="answer-text">
+                မင်း: ${text}
+
+                <br><br>
+
+                🧠 ဖိုးထောင် စဉ်းစားနေပါတယ်...
+            </div>
+        `;
+
+
+        // ==============================
+        // Send question to Backend
+        // ==============================
 
         const response = await fetch(
             `${API_URL}/chat`,
@@ -247,11 +274,14 @@ async function askAI(text) {
 
 
         if (!response.ok) {
-            throw new Error("Chat request failed");
+            throw new Error(
+                `Chat request failed: ${response.status}`
+            );
         }
 
 
         const data = await response.json();
+
 
         console.log(
             "🤖 ဖိုးထောင်:",
@@ -259,18 +289,44 @@ async function askAI(text) {
         );
 
 
-        answerBox.textContent =
-            `မင်း: ${text}\n\nဖိုးထောင်: ${data.answer}`;
+        // ==============================
+        // Show AI Answer
+        // ==============================
+
+        answerBox.innerHTML = `
+            <div class="answer-header">
+                🤖 ဖိုးထောင်
+            </div>
+
+            <div class="answer-text">
+                မင်း: ${text}
+
+                <br><br>
+
+                ${data.answer}
+            </div>
+        `;
 
 
-        console.log("✅ AI answer ရပါပြီ");
-        console.log("➡️ speak() ကို ခေါ်တော့မယ်");
+        console.log(
+            "✅ AI answer ရပါပြီ"
+        );
 
+        console.log(
+            "➡️ speak() ကို ခေါ်တော့မယ်"
+        );
+
+
+        // ==============================
+        // Speak
+        // ==============================
 
         await speak(data.answer);
 
 
-        console.log("⬅️ speak() ပြန်ပြီးပါပြီ");
+        console.log(
+            "⬅️ speak() ပြန်ပြီးပါပြီ"
+        );
 
 
     } catch (error) {
@@ -280,11 +336,28 @@ async function askAI(text) {
             error
         );
 
-        status.textContent =
-            "❌ ဖိုးထောင်နဲ့ ချိတ်ဆက်ရာမှာ Error ဖြစ်ပါတယ်။";
+
+        setStatus(
+            "ready",
+            "❌ ဖိုးထောင်နဲ့ ချိတ်ဆက်ရာမှာ Error ဖြစ်ပါတယ်။"
+        );
+
+
+        answerBox.innerHTML = `
+            <div class="answer-header">
+                🤖 ဖိုးထောင်
+            </div>
+
+            <div class="answer-text">
+                မင်း: ${text}
+
+                <br><br>
+
+                ❌ ဖိုးထောင်ဆီက အဖြေမရသေးပါ။
+            </div>
+        `;
     }
 }
-
 
 // ==============================
 // Text → Speech
