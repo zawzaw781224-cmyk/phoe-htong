@@ -15,9 +15,36 @@ recognition.continuous = false;
 recognition.interimResults = false;
 
 let isListening = false;
+let isStopping = false;
+
+
 // ==============================
-// Wake Word Check
+// Status
 // ==============================
+
+function setStatus(type, text) {
+
+    status.textContent = text;
+
+    status.className = "";
+
+    if (type === "ready") {
+        status.classList.add("status-ready");
+    }
+
+    if (type === "listening") {
+        status.classList.add("status-listening");
+    }
+
+    if (type === "thinking") {
+        status.classList.add("status-thinking");
+    }
+
+    if (type === "speaking") {
+        status.classList.add("status-speaking");
+    }
+}
+
 
 // ==============================
 // Wake Word Check
@@ -46,13 +73,22 @@ function hasWakeWord(text) {
 
 recordButton.addEventListener("click", () => {
 
+    if (isStopping) {
+        return;
+    }
+
     if (isListening) {
+
+        isStopping = true;
+
+        status.textContent = "⏹️ ရပ်နေပါတယ်...";
+
         recognition.stop();
+
         return;
     }
 
     recognition.start();
-
 });
 
 
@@ -63,10 +99,14 @@ recordButton.addEventListener("click", () => {
 recognition.onstart = () => {
 
     isListening = true;
+    isStopping = false;
 
     recordButton.textContent = "⏹️ ရပ်မယ်";
-    status.textContent = "🎤 ဖိုးထောင် နားထောင်နေပါတယ်...";
 
+    setStatus(
+        "listening",
+        "🔵 ဖိုးထောင် နားထောင်နေပါတယ်..."
+    );
 };
 
 
@@ -107,9 +147,9 @@ recognition.onresult = async (event) => {
     // ==============================
 
     const question = text
-    .replace(/ဖိုး\s*ထောင်ရေ?/g, "")
-    .replace(/ထူ\s*ထောင်/g, "")
-    .trim();
+        .replace(/ဖိုး\s*ထောင်ရေ?/g, "")
+        .replace(/ထူ\s*ထောင်/g, "")
+        .trim();
 
 
     console.log("❓ မေးခွန်း:", question);
@@ -127,15 +167,20 @@ recognition.onresult = async (event) => {
     }
 
 
-    status.textContent =
-        "🧠 ဖိုးထောင် စဉ်းစားနေပါတယ်...";
+    // ==============================
+    // Thinking
+    // ==============================
+
+    setStatus(
+        "thinking",
+        "🟡 ဖိုးထောင် စဉ်းစားနေပါတယ်..."
+    );
 
     answerBox.textContent =
         `မင်း: ${question}`;
 
 
     await askAI(question);
-
 };
 
 
@@ -146,9 +191,15 @@ recognition.onresult = async (event) => {
 recognition.onend = () => {
 
     isListening = false;
+    isStopping = false;
 
-    recordButton.textContent = "🎤 ဖိုးထောင်ကို မေးမယ်";
+    recordButton.textContent =
+        "🎤 ဖိုးထောင်ကို မေးမယ်";
 
+    setStatus(
+        "ready",
+        "🟢 Ready"
+    );
 };
 
 
@@ -158,19 +209,20 @@ recognition.onend = () => {
 
 recognition.onerror = (event) => {
 
-    console.error("Speech Error:", event.error);
+    console.error(
+        "Speech Error:",
+        event.error
+    );
 
     isListening = false;
+    isStopping = false;
 
-    recordButton.textContent = "🎤 ဖိုးထောင်ကို မေးမယ်";
+    recordButton.textContent =
+        "🎤 ဖိုးထောင်ကို မေးမယ်";
 
     status.textContent =
         "❌ အသံနားထောင်ရာမှာ ပြဿနာရှိပါတယ်။";
-
-};
-
-
-// ==============================
+};// ==============================
 // Send text to Gemini
 // ==============================
 
@@ -201,35 +253,36 @@ async function askAI(text) {
 
         const data = await response.json();
 
-
-        console.log("🤖 ဖိုးထောင်:", data.answer);
+        console.log(
+            "🤖 ဖိုးထောင်:",
+            data.answer
+        );
 
 
         answerBox.textContent =
             `မင်း: ${text}\n\nဖိုးထောင်: ${data.answer}`;
 
 
-        status.textContent =
-            "🔊 ဖိုးထောင် ပြောနေပါတယ်...";
-
-
         console.log("✅ AI answer ရပါပြီ");
         console.log("➡️ speak() ကို ခေါ်တော့မယ်");
 
+
         await speak(data.answer);
+
 
         console.log("⬅️ speak() ပြန်ပြီးပါပြီ");
 
 
     } catch (error) {
 
-        console.error(error);
+        console.error(
+            "❌ Chat Error:",
+            error
+        );
 
         status.textContent =
             "❌ ဖိုးထောင်နဲ့ ချိတ်ဆက်ရာမှာ Error ဖြစ်ပါတယ်။";
-
     }
-
 }
 
 
@@ -238,33 +291,53 @@ async function askAI(text) {
 // ==============================
 
 async function speak(text) {
+
     try {
-        console.log("🔊 TTS စတင်:", text);
 
-        status.textContent = "🔊 ဖိုးထောင် ပြောနေပါတယ်...";
+        console.log(
+            "🔊 TTS စတင်:",
+            text
+        );
 
-        console.log("📡 /tts ကို request ပို့နေပါတယ်...");
+
+        console.log(
+            "📡 /tts ကို request ပို့နေပါတယ်..."
+        );
+
 
         const response = await fetch(
             `${API_URL}/tts`,
             {
                 method: "POST",
+
                 headers: {
                     "Content-Type": "application/json"
                 },
+
                 body: JSON.stringify({
                     text: text
                 })
             }
         );
 
-        console.log("📥 /tts response:", response.status);
+
+        console.log(
+            "📥 /tts response:",
+            response.status
+        );
+
 
         if (!response.ok) {
-            throw new Error(`TTS request failed: ${response.status}`);
+
+            throw new Error(
+                `TTS request failed: ${response.status}`
+            );
         }
 
-        const audioBlob = await response.blob();
+
+        const audioBlob =
+            await response.blob();
+
 
         console.log(
             "🎵 Audio ရပါပြီ:",
@@ -272,34 +345,71 @@ async function speak(text) {
             "bytes"
         );
 
-        const audioUrl = URL.createObjectURL(audioBlob);
-        const audio = new Audio(audioUrl);
+
+        const audioUrl =
+            URL.createObjectURL(audioBlob);
+
+        const audio =
+            new Audio(audioUrl);
+
 
         audio.onplay = () => {
-            console.log("▶️ Audio စတင်ဖွင့်နေပါတယ်");
+
+            console.log(
+                "▶️ Audio စတင်ဖွင့်နေပါတယ်"
+            );
+
+            setStatus(
+                "speaking",
+                "🟣 ဖိုးထောင် ရှင်းပြနေပါတယ်..."
+            );
         };
 
+
         audio.onended = () => {
-            console.log("✅ Audio ပြီးပါပြီ");
+
+            console.log(
+                "✅ Audio ပြီးပါပြီ"
+            );
 
             URL.revokeObjectURL(audioUrl);
 
-            status.textContent =
-                "🎤 ဖိုးထောင်ကို မေးနိုင်ပါတယ်။";
+            setStatus(
+                "ready",
+                "🟢 Ready"
+            );
         };
+
 
         audio.onerror = (event) => {
-            console.error("❌ Audio playback error:", event);
+
+            console.error(
+                "❌ Audio playback error:",
+                event
+            );
+
         };
 
-        console.log("▶️ Audio play() ခေါ်နေပါတယ်...");
+
+        console.log(
+            "▶️ Audio play() ခေါ်နေပါတယ်..."
+        );
+
 
         await audio.play();
 
-        console.log("✅ audio.play() အောင်မြင်ပါတယ်");
+
+        console.log(
+            "✅ audio.play() အောင်မြင်ပါတယ်"
+        );
+
 
     } catch (error) {
-        console.error("❌ TTS Error:", error);
+
+        console.error(
+            "❌ TTS Error:",
+            error
+        );
 
         status.textContent =
             "❌ ဖိုးထောင် အသံထွက်ရာမှာ Error ဖြစ်ပါတယ်။";

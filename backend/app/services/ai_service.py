@@ -1,34 +1,24 @@
 import base64
-import requests
 
 from google import genai
 
-from app.core.config import (
-    GEMINI_API_KEY,
-    OPENROUTER_API_KEY,
+from app.core.config import GEMINI_API_KEY
+from app.services.conversation_service import (
+    add_message,
+    get_history,
 )
 
 
-# Gemini client — နောက်ပိုင်းပြန်သုံးနိုင်အောင်ထားမယ်
-client = genai.Client(api_key=GEMINI_API_KEY)
+client = genai.Client(
+    api_key=GEMINI_API_KEY
+)
 
 
-OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 
 def ask_phohtaung(question: str) -> str:
-    response = requests.post(
-        OPENROUTER_URL,
-        headers={
-            "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-            "Content-Type": "application/json",
-        },
-        json={
-            "model": "google/gemma-4-31b-it:free",
-            "messages": [
-                {
-    "role": "system",
-    "content": """
+
+    system_prompt = """
 You are "ဖိုးထောင်", a friendly AI tutor for a Myanmar student.
 
 LANGUAGE RULES:
@@ -38,27 +28,40 @@ LANGUAGE RULES:
 - If you use an English technical term, explain its meaning in Myanmar.
 - Never invent meanings for words.
 - Carefully understand the student's exact question before answering.
-- If the student asks about "ဝက်ဘ်ဆိုက်", understand it as "website", not "brick".
 - Give accurate, simple, student-friendly explanations.
 - Answer directly and avoid unnecessary complicated wording.
 
 Your name is ဖိုးထောင်.
 """
-},
-                {
-                    "role": "user",
-                    "content": question,
-                },
-            ],
+
+    # User message ကို memory ထဲသိမ်း
+    add_message("user", question)
+
+    history = get_history()
+
+    contents = []
+
+    for message in history:
+        contents.append(
+            f"{message['role']}: {message['content']}"
+        )
+
+    conversation = "\n".join(contents)
+
+    response = client.models.generate_content(
+        model="gemini-3.8-flash",
+        contents=conversation,
+        config={
+            "system_instruction": system_prompt,
         },
-        timeout=60,
     )
 
-    response.raise_for_status()
+    answer = response.text
 
-    data = response.json()
+    # AI answer ကို memory ထဲသိမ်း
+    add_message("assistant", answer)
 
-    return data["choices"][0]["message"]["content"]
+    return answer
 
 
 def transcribe_audio(audio_bytes: bytes, mime_type: str) -> str:
