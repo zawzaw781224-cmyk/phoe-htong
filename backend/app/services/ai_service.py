@@ -166,64 +166,29 @@ IMPORTANT:
 
 
     # ==============================
-    # Gemini Request + Retry
+    # Gemini Request
     # ==============================
 
-    max_retries = 3
+    try:
 
-    response = None
+        print("🤖 Gemini request...")
 
-    for attempt in range(max_retries):
+        response = client.models.generate_content(
+            model="gemini-3.6-flash",
+            contents=conversation,
+            config=types.GenerateContentConfig(
+                system_instruction=system_prompt,
+            ),
+        )
 
-        try:
+        print("✅ Gemini response ရပါပြီ")
 
-            print(
-                f"🤖 Gemini request "
-                f"(attempt {attempt + 1}/{max_retries})"
-            )
+    except Exception as error:
 
-            response = client.models.generate_content(
-                model="gemini-3.6-flash",
-                contents=conversation,
-                config=types.GenerateContentConfig(
-                    system_instruction=system_prompt,
-                ),
-            )
+        print("❌ Gemini request failed")
+        print(f"⚠️ Error: {error}")
 
-            print("✅ Gemini response ရပါပြီ")
-
-            break
-
-
-        except Exception as error:
-
-            print(
-                f"⚠️ Gemini request failed "
-                f"(attempt {attempt + 1}/{max_retries})"
-            )
-
-            print(
-                f"⚠️ Error: {error}"
-            )
-
-
-            # နောက်ဆုံး attempt ဖြစ်ရင်
-            # error ကို backend ဆီပြန်ပို့
-            if attempt == max_retries - 1:
-
-                print(
-                    "❌ Gemini request အားလုံး မအောင်မြင်ပါ"
-                )
-
-                raise
-
-
-            # Retry မလုပ်ခင် 2 seconds စောင့်
-            print(
-                "⏳ 2 seconds စောင့်ပြီး retry လုပ်ပါမယ်..."
-            )
-
-            time.sleep(2)
+        raise
 
 
     # ==============================
@@ -231,7 +196,6 @@ IMPORTANT:
     # ==============================
 
     answer = response.text
-
 
     # ==============================
     # Save Conversation
