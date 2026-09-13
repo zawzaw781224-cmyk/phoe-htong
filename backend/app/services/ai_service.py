@@ -169,7 +169,7 @@ def transcribe_audio(
 
 
     interaction = client.interactions.create(
-        model="gemini-3.8-flash",
+        model="gemini-3.6-flash",
         input=[
             {
                 "type": "text",
